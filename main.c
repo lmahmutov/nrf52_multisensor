@@ -106,7 +106,8 @@ ZB_ZCL_DECLARE_REL_HUMIDITY_MEASUREMENT_ATTRIB_LIST(humydity_attr_list,
 
 ZB_ZCL_DECLARE_POWER_CONFIG_SIMPLIFIED_ATTRIB_LIST(battery_simplified_attr_list, 
                                             &m_dev_ctx.power_attr.battery_voltage,
-                                            &m_dev_ctx.power_attr.battery_remaining_percentage);
+                                            &m_dev_ctx.power_attr.battery_remaining_percentage,
+                                            &m_dev_ctx.power_attr.alarm_state);
 
 ZB_DECLARE_MULTI_SENSOR_CLUSTER_LIST(multi_sensor_clusters,
                                      basic_attr_list,
@@ -208,6 +209,7 @@ static void multi_sensor_clusters_attr_init(void)
     /* Voltage measurement cluster attributes data */
     m_dev_ctx.power_attr.battery_voltage          = ZB_ZCL_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
     m_dev_ctx.power_attr.battery_remaining_percentage        = ZB_ZCL_POWER_CONFIG_BATTERY_REMAINING_UNKNOWN;
+    m_dev_ctx.power_attr.alarm_state              = ZB_ZCL_POWER_CONFIG_BATTERY_ALARM_STATE_DEFAULT_VALUE;
 }
 
 /**@brief Function for initializing LEDs.
@@ -233,7 +235,7 @@ static void zb_app_timer_handler(void * context)
 {
     zb_zcl_status_t zcl_status;
     static zb_int16_t new_temp_value, new_humm_value;
-    static zb_uint8_t new_voltage_value;
+    static zb_int8_t new_voltage_value;
     
     /* Get data from bme280 */
     BME280_Get_Data( resultPTH );
@@ -267,18 +269,18 @@ static void zb_app_timer_handler(void * context)
         NRF_LOG_INFO("Set humm value fail. zcl_status: %d", zcl_status);
     }
 
-//    /* Get new voltage measured value */
-//    new_voltage_value =  0xAE;
-//    zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
-//                                     ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
-//                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
-//                                     ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, 
-//                                     &new_voltage_value, 
-//                                     ZB_FALSE);
-//    if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
-//    {
-//        NRF_LOG_INFO("Set voltage value fail. zcl_status: %d", zcl_status);
-//    }
+    /* Get new voltage measured value */
+    new_voltage_value =   (zb_int8_t)(VBAT / 10);
+    zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
+                                     ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
+                                     ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, 
+                                     (zb_uint8_t *)&new_voltage_value, 
+                                     ZB_FALSE);
+    if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
+    {
+        NRF_LOG_INFO("Set voltage value fail. zcl_status: %d", zcl_status);
+    }
 
 }
 
