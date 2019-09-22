@@ -64,7 +64,7 @@
 #include "ADC.h"
 
 #define IEEE_CHANNEL_MASK                  (1l << ZIGBEE_CHANNEL)               /**< Scan only one, predefined channel to find the coordinator. */
-#define ERASE_PERSISTENT_CONFIG            ZB_TRUE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
+#define ERASE_PERSISTENT_CONFIG            ZB_FALSE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
 #define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
 #define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                  /**< Button ID used to join to network and leave from network*/
@@ -73,7 +73,9 @@
 #define LEAVE_JOIN_BUTTON_LONG_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
 
 static zb_bool_t in_progress;
+static zb_bool_t joined;
 static zb_time_t timestamp;
+static int try_to_connect = 5;
 
 /* --------- BME280--------*/
 static int32_t  resultPTH[3];
@@ -235,7 +237,7 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
 {
     zb_time_t current_time;
     zb_bool_t short_expired;
-    zb_bool_t on_off;
+    zb_bool_t  ret;
     zb_ret_t zb_err_code;
 
     current_time = ZB_TIMER_GET();
@@ -255,7 +257,17 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
         if (!short_expired)
         {
             /* Check joined or not!!!. */
-            NRF_LOG_INFO("Short press. button released");
+            if (joined)
+            {
+              NRF_LOG_INFO("Short press. Joined");
+            }
+            else
+            {
+              NRF_LOG_INFO("Short press. Not joined, starting join attempt");
+              try_to_connect = 5;
+              ret = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
+              ZB_COMM_STATUS_CHECK(ret);
+            }            
         }
 
         /* Button released - wait for accept next event. */
@@ -265,10 +277,17 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
     {
         if (short_expired)
         {
-          /* Send leave network command and check button release */
-            NRF_LOG_INFO("Long press detected");
-            zb_err_code = ZB_SCHEDULE_ALARM(leave_join_button_handler, button, LEAVE_JOIN_BUTTON_LONG_POLL_TMO);
-            ZB_ERROR_CHECK(zb_err_code);
+           if (joined)
+            {
+              NRF_LOG_INFO("Long press. Leaving from network - and soft reset");
+              zb_bdb_reset_via_local_action(0);
+            }
+            else
+            {
+              NRF_LOG_INFO("Long press. Not joined");
+            }
+            /* Long press detected - wait for accept next event. */
+            in_progress = ZB_FALSE;
         }
         else
         {
@@ -416,15 +435,21 @@ void zboss_signal_handler(zb_uint8_t param)
             {
                 NRF_LOG_INFO("Joined network successfully");
                 bsp_board_led_on(ZIGBEE_NETWORK_STATE_LED);
+                joined = ZB_TRUE;
                 ret_code_t err_code = app_timer_start(zb_app_timer, APP_TIMER_TICKS(1000), NULL);
                 APP_ERROR_CHECK(err_code);
+                try_to_connect = 5;
             }
             else
             {
-                NRF_LOG_ERROR("Failed to join network. Status: %d", status);
-                bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
-                comm_status = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
-                ZB_COMM_STATUS_CHECK(comm_status);
+                if (try_to_connect!=0) {
+                    NRF_LOG_ERROR("Failed to join network. Status: %d", status);
+                    joined = ZB_FALSE;
+                    bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
+                    comm_status = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
+                    ZB_COMM_STATUS_CHECK(comm_status);
+                    try_to_connect --;
+                }
             }
             break;
 
@@ -432,7 +457,9 @@ void zboss_signal_handler(zb_uint8_t param)
             if (status == RET_OK)
             {
                 bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
-
+                joined = ZB_FALSE;
+                ret_code_t err_code = app_timer_stop(zb_app_timer);
+                APP_ERROR_CHECK(err_code);
                 zb_zdo_signal_leave_params_t *p_leave_params = ZB_ZDO_SIGNAL_GET_PARAMS(p_sg_p, zb_zdo_signal_leave_params_t);
                 NRF_LOG_INFO("Network left. Leave type: %d", p_leave_params->leave_type);
             }
