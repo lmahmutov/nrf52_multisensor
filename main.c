@@ -61,7 +61,6 @@
 /* I2c library */
 #include "I2C.h"
 #include "BME280.h"
-//#include "nrf_delay.h"
 #include "ADC.h"
 
 #define IEEE_CHANNEL_MASK                  (1l << ZIGBEE_CHANNEL)               /**< Scan only one, predefined channel to find the coordinator. */
@@ -236,9 +235,9 @@ static void zb_app_timer_handler(void * context)
     static zb_int16_t new_temp_value, new_humm_value;
     static zb_uint8_t new_voltage_value;
     
-    /* Получаем данные с реального сенсора */
+    /* Get data from bme280 */
     BME280_Get_Data( resultPTH );
-    /* Замер батарейки                     */
+    /* Get battery voltage                     */
     int16_t VBAT = GetBatteryVoltage1();
     NRF_LOG_INFO("Battery voltage %d.", VBAT);
 
