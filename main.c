@@ -290,7 +290,7 @@ static void zb_app_timer_handler(void * context)
     }
 
     /* Get new voltage measured value */
-    new_voltage_value =   (zb_int8_t)(VBAT / 10);
+    new_voltage_value =   (zb_int8_t)(VBAT / 100);
     zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
