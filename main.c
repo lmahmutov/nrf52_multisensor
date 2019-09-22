@@ -104,6 +104,12 @@ ZB_ZCL_DECLARE_REL_HUMIDITY_MEASUREMENT_ATTRIB_LIST(humydity_attr_list,
                                             &m_dev_ctx.humm_attr.min_measure_value, 
                                             &m_dev_ctx.humm_attr.max_measure_value);
 
+ZB_ZCL_DECLARE_PRES_MEASUREMENT_ATTRIB_LIST(pressure_attr_list, 
+                                            &m_dev_ctx.pres_attr.measure_value, 
+                                            &m_dev_ctx.pres_attr.min_measure_value, 
+                                            &m_dev_ctx.pres_attr.max_measure_value, 
+                                            &m_dev_ctx.pres_attr.tolerance);
+
 ZB_ZCL_DECLARE_POWER_CONFIG_SIMPLIFIED_ATTRIB_LIST(battery_simplified_attr_list, 
                                             &m_dev_ctx.power_attr.battery_voltage,
                                             &m_dev_ctx.power_attr.battery_remaining_percentage,
@@ -114,6 +120,7 @@ ZB_DECLARE_MULTI_SENSOR_CLUSTER_LIST(multi_sensor_clusters,
                                      identify_attr_list,
                                      temperature_attr_list,
                                      humydity_attr_list,
+                                     pressure_attr_list,
                                      battery_simplified_attr_list);
 
 ZB_ZCL_DECLARE_MULTI_SENSOR_EP(multi_sensor_ep,
@@ -194,12 +201,12 @@ static void multi_sensor_clusters_attr_init(void)
     m_dev_ctx.temp_attr.max_measure_value        = ZB_ZCL_ATTR_TEMP_MEASUREMENT_MAX_VALUE_MAX_VALUE;
     m_dev_ctx.temp_attr.tolerance                = ZB_ZCL_ATTR_TEMP_MEASUREMENT_TOLERANCE_MAX_VALUE;
 
-//    /* Pressure measurement cluster attributes data */
-//    m_dev_ctx.pres_attr.measure_value            = ZB_ZCL_ATTR_PRES_MEASUREMENT_VALUE_UNKNOWN;
-//    m_dev_ctx.pres_attr.min_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MIN_VALUE_MIN_VALUE;
-//    m_dev_ctx.pres_attr.max_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MAX_VALUE_MAX_VALUE;
-//    m_dev_ctx.pres_attr.tolerance                = ZB_ZCL_ATTR_PRES_MEASUREMENT_TOLERANCE_MAX_VALUE;
-//    
+    /* Pressure measurement cluster attributes data */
+    m_dev_ctx.pres_attr.measure_value            = ZB_ZCL_ATTR_PRES_MEASUREMENT_VALUE_UNKNOWN;
+    m_dev_ctx.pres_attr.min_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MIN_VALUE_MIN_VALUE;
+    m_dev_ctx.pres_attr.max_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MAX_VALUE_MAX_VALUE;
+    m_dev_ctx.pres_attr.tolerance                = ZB_ZCL_ATTR_PRES_MEASUREMENT_TOLERANCE_MAX_VALUE;
+    
     /* humidity measurement cluster attributes data */
     m_dev_ctx.humm_attr.measure_value            = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_UNKNOWN;
     m_dev_ctx.humm_attr.min_measure_value        = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_MIN_VALUE_MIN_VALUE;
@@ -234,7 +241,7 @@ static zb_void_t leds_init(void)
 static void zb_app_timer_handler(void * context)
 {
     zb_zcl_status_t zcl_status;
-    static zb_int16_t new_temp_value, new_humm_value;
+    static zb_int16_t new_temp_value, new_humm_value, new_pres_value;
     static zb_int8_t new_voltage_value;
     
     /* Get data from bme280 */
@@ -267,6 +274,19 @@ static void zb_app_timer_handler(void * context)
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         NRF_LOG_INFO("Set humm value fail. zcl_status: %d", zcl_status);
+    }
+    
+    /* Get new pressure measured value */
+    new_pres_value = (zb_int16_t)(resultPTH[0] / 100);
+    zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
+                                     ZB_ZCL_CLUSTER_ID_PRESSURE_MEASUREMENT, 
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
+                                     ZB_ZCL_ATTR_PRES_MEASUREMENT_VALUE_ID, 
+                                     (zb_uint8_t *)&new_pres_value, 
+                                     ZB_FALSE);
+                                         if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
+    {
+        NRF_LOG_INFO("Set pressure value fail. zcl_status: %d", zcl_status);
     }
 
     /* Get new voltage measured value */

@@ -69,12 +69,13 @@ typedef struct
     zb_zcl_identify_attrs_t             identify_attr;
     zb_zcl_temp_measurement_attrs_t     temp_attr;
     zb_zcl_humm_measurement_attrs_t     humm_attr;
+    zb_zcl_pressure_measurement_attrs_t pres_attr;
     battery_simplified_attr_t           power_attr;
 } sensor_device_ctx_t;
 
-#define ZB_MULTI_SENSOR_REPORT_ATTR_COUNT  4
+#define ZB_MULTI_SENSOR_REPORT_ATTR_COUNT  5
 #define ZB_DEVICE_VER_MULTI_SENSOR         0                                    /**< Multisensor device version. */
-#define ZB_MULTI_SENSOR_IN_CLUSTER_NUM     5                                    /**< Number of the input (server) clusters in the multisensor device. */
+#define ZB_MULTI_SENSOR_IN_CLUSTER_NUM     6                                    /**< Number of the input (server) clusters in the multisensor device. */
 #define ZB_MULTI_SENSOR_OUT_CLUSTER_NUM    1                                    /**< Number of the output (client) clusters in the multisensor device. */
 
 /** @brief Declares cluster list for the multisensor device.
@@ -91,6 +92,7 @@ typedef struct
       identify_attr_list,                                           \
       temp_measure_attr_list,                                       \
       humm_measure_attr_list,                                       \
+      pres_measure_attr_list,                                       \
       power_measure_attr_list)                                      \
       zb_zcl_cluster_desc_t cluster_list_name[] =                   \
       {                                                             \
@@ -119,6 +121,13 @@ typedef struct
           ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT,               \
           ZB_ZCL_ARRAY_SIZE(humm_measure_attr_list, zb_zcl_attr_t), \
           (humm_measure_attr_list),                                 \
+          ZB_ZCL_CLUSTER_SERVER_ROLE,                               \
+          ZB_ZCL_MANUF_CODE_INVALID                                 \
+        ),                                                          \
+        ZB_ZCL_CLUSTER_DESC(                                        \
+          ZB_ZCL_CLUSTER_ID_PRESSURE_MEASUREMENT,                   \
+          ZB_ZCL_ARRAY_SIZE(pres_measure_attr_list, zb_zcl_attr_t), \
+          (pres_measure_attr_list),                                 \
           ZB_ZCL_CLUSTER_SERVER_ROLE,                               \
           ZB_ZCL_MANUF_CODE_INVALID                                 \
         ),                                                          \
@@ -161,6 +170,7 @@ typedef struct
       ZB_ZCL_CLUSTER_ID_IDENTIFY,                                                     \
       ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,                                             \
       ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT,                                     \
+      ZB_ZCL_CLUSTER_ID_PRESSURE_MEASUREMENT,                                         \
       ZB_ZCL_CLUSTER_ID_POWER_CONFIG,                                                 \
       ZB_ZCL_CLUSTER_ID_IDENTIFY,                                                     \
     }                                                                                 \
