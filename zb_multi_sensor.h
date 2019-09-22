@@ -53,9 +53,9 @@ extern "C" {
 #define SENSOR_INIT_BASIC_APP_VERSION       01                                  /**< Version of the application software (1 byte). */
 #define SENSOR_INIT_BASIC_STACK_VERSION     10                                  /**< Version of the implementation of the Zigbee stack (1 byte). */
 #define SENSOR_INIT_BASIC_HW_VERSION        11                                  /**< Version of the hardware of the device (1 byte). */
-#define SENSOR_INIT_BASIC_MANUF_NAME        "Nordic"                            /**< Manufacturer name (32 bytes). */
-#define SENSOR_INIT_BASIC_MODEL_ID          "Multisensor"                       /**< Model number assigned by the manufacturer (32-bytes long string). */
-#define SENSOR_INIT_BASIC_DATE_CODE         "20180921"                          /**< Date provided by the manufacturer of the device in ISO 8601 format (YYYYMMDD), for the first 8 bytes. The remaining 8 bytes are manufacturer-specific. */
+#define SENSOR_INIT_BASIC_MANUF_NAME        "nrf52840.ru"                            /**< Manufacturer name (32 bytes). */
+#define SENSOR_INIT_BASIC_MODEL_ID          "sensor1"                       /**< Model number assigned by the manufacturer (32-bytes long string). */
+#define SENSOR_INIT_BASIC_DATE_CODE         "20190922"                          /**< Date provided by the manufacturer of the device in ISO 8601 format (YYYYMMDD), for the first 8 bytes. The remaining 8 bytes are manufacturer-specific. */
 #define SENSOR_INIT_BASIC_POWER_SOURCE      ZB_ZCL_BASIC_POWER_SOURCE_BATTERY   /**< Type of power source or sources available for the device. For possible values, see section 3.2.2.2.8 of the ZCL specification. */
 #define SENSOR_INIT_BASIC_LOCATION_DESC     "Office desk"                       /**< Description of the physical location of the device (16 bytes). You can modify it during the commisioning process. */
 #define SENSOR_INIT_BASIC_PH_ENV            ZB_ZCL_BASIC_ENV_UNSPECIFIED        /**< Description of the type of physical environment. For possible values, see section 3.2.2.2.10 of the ZCL specification. */
@@ -69,10 +69,10 @@ typedef struct
     zb_zcl_identify_attrs_t             identify_attr;
     zb_zcl_temp_measurement_attrs_t     temp_attr;
     zb_zcl_humm_measurement_attrs_t     humm_attr;
-    zb_zcl_power_measurement_attrs_t    power_attr;
+    battery_simplified_attr_t           power_attr;
 } sensor_device_ctx_t;
 
-#define ZB_MULTI_SENSOR_REPORT_ATTR_COUNT  ZB_ZCL_TEMP_MEASUREMENT_REPORT_ATTR_COUNT + ZB_ZCL_REL_HUMIDITY_MEASUREMENT_REPORT_ATTR_COUNT + ZB_ZCL_POWER_CONFIG_REPORT_ATTR_COUNT
+#define ZB_MULTI_SENSOR_REPORT_ATTR_COUNT  4
 #define ZB_DEVICE_VER_MULTI_SENSOR         0                                    /**< Multisensor device version. */
 #define ZB_MULTI_SENSOR_IN_CLUSTER_NUM     5                                    /**< Number of the input (server) clusters in the multisensor device. */
 #define ZB_MULTI_SENSOR_OUT_CLUSTER_NUM    1                                    /**< Number of the output (client) clusters in the multisensor device. */

@@ -98,6 +98,9 @@
       <file file_name="../../../../../../../modules/nrfx/drivers/src/nrfx_timer.c" />
       <file file_name="../../../../../../../modules/nrfx/drivers/src/nrfx_uart.c" />
       <file file_name="../../../../../../../modules/nrfx/drivers/src/nrfx_uarte.c" />
+      <file file_name="../../../../../../../integration/nrfx/legacy/nrf_drv_twi.c" />
+      <file file_name="../../../../../../../modules/nrfx/drivers/src/nrfx_twi.c" />
+      <file file_name="../../../../../../../modules/nrfx/drivers/src/nrfx_twim.c" />
     </folder>
     <folder Name="Board Support">
       <file file_name="../../../../../../../components/libraries/bsp/bsp.c" />
@@ -105,6 +108,9 @@
     <folder Name="Application">
       <file file_name="../../../main.c" />
       <file file_name="../config/sdk_config.h" />
+      <file file_name="../../../I2C.c" />
+      <file file_name="../../../ADC.c" />
+      <file file_name="../../../BME280.c" />
     </folder>
     <folder Name="None">
       <file file_name="../../../../../../../modules/nrfx/mdk/ses_startup_nrf52840.s" />
