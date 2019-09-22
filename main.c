@@ -58,12 +58,20 @@
 #include "nrf_log_default_backends.h"
 
 #include "zb_multi_sensor.h"
+/* I2c library */
+#include "I2C.h"
+#include "BME280.h"
+//#include "nrf_delay.h"
+#include "ADC.h"
 
 #define IEEE_CHANNEL_MASK                  (1l << ZIGBEE_CHANNEL)               /**< Scan only one, predefined channel to find the coordinator. */
 #define ERASE_PERSISTENT_CONFIG            ZB_TRUE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
 #define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
 
+/* --------- BME280--------*/
+static int32_t  resultPTH[3];
+/* ----------------------- */
 #if !defined ZB_ED_ROLE
 #error Define ZB_ED_ROLE to compile End Device source code.
 #endif
@@ -97,30 +105,16 @@ ZB_ZCL_DECLARE_REL_HUMIDITY_MEASUREMENT_ATTRIB_LIST(humydity_attr_list,
                                             &m_dev_ctx.humm_attr.min_measure_value, 
                                             &m_dev_ctx.humm_attr.max_measure_value);
 
-
-ZB_ZCL_DECLARE_POWER_CONFIG_BATTERY_ATTRIB_LIST_EXT(power_attr_list,
-                                            &m_dev_ctx.power_attr.voltage_value,
-                                            NULL,
-                                            NULL,                            
-                                            NULL,                            
-                                            NULL,                                        
-                                            NULL,
-                                            &m_dev_ctx.power_attr.remaining_value,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL);
+ZB_ZCL_DECLARE_POWER_CONFIG_SIMPLIFIED_ATTRIB_LIST(battery_simplified_attr_list, 
+                                            &m_dev_ctx.power_attr.battery_voltage,
+                                            &m_dev_ctx.power_attr.battery_remaining_percentage);
 
 ZB_DECLARE_MULTI_SENSOR_CLUSTER_LIST(multi_sensor_clusters,
                                      basic_attr_list,
                                      identify_attr_list,
                                      temperature_attr_list,
                                      humydity_attr_list,
-                                     power_attr_list);
+                                     battery_simplified_attr_list);
 
 ZB_ZCL_DECLARE_MULTI_SENSOR_EP(multi_sensor_ep,
                                MULTI_SENSOR_ENDPOINT,
@@ -194,15 +188,27 @@ static void multi_sensor_clusters_attr_init(void)
     /* Identify cluster attributes data */
     m_dev_ctx.identify_attr.identify_time        = ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE;
 
-    /* Temperature measurement cluster attributes data */
+     /* Temperature measurement cluster attributes data */
     m_dev_ctx.temp_attr.measure_value            = ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_UNKNOWN;
-    
-    /* Humydity measurement cluster attributes data */
-    m_dev_ctx.humm_attr.measure_value           = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_UNKNOWN;
+    m_dev_ctx.temp_attr.min_measure_value        = ZB_ZCL_ATTR_TEMP_MEASUREMENT_MIN_VALUE_MIN_VALUE;
+    m_dev_ctx.temp_attr.max_measure_value        = ZB_ZCL_ATTR_TEMP_MEASUREMENT_MAX_VALUE_MAX_VALUE;
+    m_dev_ctx.temp_attr.tolerance                = ZB_ZCL_ATTR_TEMP_MEASUREMENT_TOLERANCE_MAX_VALUE;
+
+//    /* Pressure measurement cluster attributes data */
+//    m_dev_ctx.pres_attr.measure_value            = ZB_ZCL_ATTR_PRES_MEASUREMENT_VALUE_UNKNOWN;
+//    m_dev_ctx.pres_attr.min_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MIN_VALUE_MIN_VALUE;
+//    m_dev_ctx.pres_attr.max_measure_value        = ZB_ZCL_ATTR_PRES_MEASUREMENT_MAX_VALUE_MAX_VALUE;
+//    m_dev_ctx.pres_attr.tolerance                = ZB_ZCL_ATTR_PRES_MEASUREMENT_TOLERANCE_MAX_VALUE;
+//    
+    /* humidity measurement cluster attributes data */
+    m_dev_ctx.humm_attr.measure_value            = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_UNKNOWN;
+    m_dev_ctx.humm_attr.min_measure_value        = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_MIN_VALUE_MIN_VALUE;
+    m_dev_ctx.humm_attr.max_measure_value        = ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_MIN_VALUE_MAX_VALUE;
+
 
     /* Voltage measurement cluster attributes data */
-    m_dev_ctx.power_attr.voltage_value          = ZB_ZCL_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
-    m_dev_ctx.power_attr.remaining_value        = ZB_ZCL_POWER_CONFIG_BATTERY_REMAINING_UNKNOWN;
+    m_dev_ctx.power_attr.battery_voltage          = ZB_ZCL_POWER_CONFIG_BATTERY_VOLTAGE_INVALID;
+    m_dev_ctx.power_attr.battery_remaining_percentage        = ZB_ZCL_POWER_CONFIG_BATTERY_REMAINING_UNKNOWN;
 }
 
 /**@brief Function for initializing LEDs.
@@ -227,10 +233,17 @@ static zb_void_t leds_init(void)
 static void zb_app_timer_handler(void * context)
 {
     zb_zcl_status_t zcl_status;
-    static zb_int16_t new_temp_value, new_humm_value, new_voltage_value;
+    static zb_int16_t new_temp_value, new_humm_value;
+    static zb_uint8_t new_voltage_value;
+    
+    /* Получаем данные с реального сенсора */
+    BME280_Get_Data( resultPTH );
+    /* Замер батарейки                     */
+    int16_t VBAT = GetBatteryVoltage1();
+    NRF_LOG_INFO("Battery voltage %d.", VBAT);
 
     /* Get new temperature measured value */
-    new_temp_value = 0x1234;
+     new_temp_value = (zb_int16_t)resultPTH[1];
     zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT, 
                                      ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
@@ -243,7 +256,7 @@ static void zb_app_timer_handler(void * context)
     }
 
     /* Get new humm measured value */
-    new_humm_value = 0x1234;
+    new_humm_value = (zb_int16_t)(resultPTH[2] / 10);
     zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
@@ -255,18 +268,19 @@ static void zb_app_timer_handler(void * context)
         NRF_LOG_INFO("Set humm value fail. zcl_status: %d", zcl_status);
     }
 
-    /* Get new voltage measured value */
-    new_voltage_value = 0xFF;
+//    /* Get new voltage measured value */
+//    new_voltage_value =  0xAE;
 //    zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
 //                                     ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
 //                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
 //                                     ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, 
-//                                     (zb_uint8_t *)&new_voltage_value, 
+//                                     &new_voltage_value, 
 //                                     ZB_FALSE);
 //    if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
 //    {
 //        NRF_LOG_INFO("Set voltage value fail. zcl_status: %d", zcl_status);
 //    }
+
 }
 
 
@@ -352,7 +366,9 @@ int main(void)
     timers_init();
     log_init();
     leds_init();
-
+    /* I2C Init */
+    I2C_init();
+    BME280_Turn_On();
     /* Create Timer for reporting attribute */
     err_code = app_timer_create(&zb_app_timer, APP_TIMER_MODE_REPEATED, zb_app_timer_handler);
     APP_ERROR_CHECK(err_code);
