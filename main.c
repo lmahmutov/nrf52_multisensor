@@ -67,6 +67,13 @@
 #define ERASE_PERSISTENT_CONFIG            ZB_TRUE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
 #define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
+#define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                  /**< Button ID used to join to network and leave from network*/
+#define LEAVE_JOIN_BUTTON_THRESHOLD       ZB_TIME_ONE_SECOND                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
+#define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO  ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
+#define LEAVE_JOIN_BUTTON_LONG_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
+
+static zb_bool_t in_progress;
+static zb_time_t timestamp;
 
 /* --------- BME280--------*/
 static int32_t  resultPTH[3];
@@ -219,14 +226,98 @@ static void multi_sensor_clusters_attr_init(void)
     m_dev_ctx.power_attr.alarm_state              = ZB_ZCL_POWER_CONFIG_BATTERY_ALARM_STATE_DEFAULT_VALUE;
 }
 
+
+/**@brief Callback for detecting button press duration.
+ *
+ * @param[in]   button   BSP Button that was pressed.
+ */
+static zb_void_t leave_join_button_handler(zb_uint8_t button)
+{
+    zb_time_t current_time;
+    zb_bool_t short_expired;
+    zb_bool_t on_off;
+    zb_ret_t zb_err_code;
+
+    current_time = ZB_TIMER_GET();
+
+    if (ZB_TIME_SUBTRACT(current_time, timestamp) > LEAVE_JOIN_BUTTON_THRESHOLD)
+    {
+        short_expired = ZB_TRUE;
+    }
+    else
+    {
+        short_expired = ZB_FALSE;
+    }
+
+    /* Check if button was released during LEAVE_JOIN_BUTTON_SHORT_POLL_TMO. */
+    if (!bsp_button_is_pressed(button))
+    {
+        if (!short_expired)
+        {
+            /* Check joined or not!!!. */
+            NRF_LOG_INFO("Short press. button released");
+        }
+
+        /* Button released - wait for accept next event. */
+        in_progress = ZB_FALSE;
+    }
+    else
+    {
+        if (short_expired)
+        {
+          /* Send leave network command and check button release */
+            NRF_LOG_INFO("Long press detected");
+            zb_err_code = ZB_SCHEDULE_ALARM(leave_join_button_handler, button, LEAVE_JOIN_BUTTON_LONG_POLL_TMO);
+            ZB_ERROR_CHECK(zb_err_code);
+        }
+        else
+        {
+            /* Wait another LEAVE_JOIN_BUTTON_SHORT_POLL_TMO, until LEAVE_JOIN_BUTTON_THRESHOLD will be reached. */
+            zb_err_code = ZB_SCHEDULE_ALARM(leave_join_button_handler, button, LEAVE_JOIN_BUTTON_SHORT_POLL_TMO);
+            ZB_ERROR_CHECK(zb_err_code);
+        }
+    }
+}
+
+
+/**@brief Callback for button events.
+ *
+ * @param[in]   evt      Incoming event from the BSP subsystem.
+ */
+static void buttons_handler(bsp_event_t evt)
+{
+    zb_ret_t zb_err_code;
+    zb_uint32_t button;
+
+    switch(evt)
+    {
+        case BSP_EVENT_KEY_0:
+            button = LEAVE_JOIN_BUTTON;
+            break;
+
+        default:
+            NRF_LOG_INFO("Unhandled BSP Event received: %d", evt);
+            return;
+    }
+
+    if (!in_progress)
+    {
+        in_progress = ZB_TRUE;
+        timestamp = ZB_TIMER_GET();
+
+        zb_err_code = ZB_SCHEDULE_ALARM(leave_join_button_handler, button, LEAVE_JOIN_BUTTON_SHORT_POLL_TMO);
+        ZB_ERROR_CHECK(zb_err_code);
+    }
+}
+
 /**@brief Function for initializing LEDs.
  */
 static zb_void_t leds_init(void)
 {
     ret_code_t error_code;
 
-    /* Initialize LEDs and buttons - use BSP to control them. */
-    error_code = bsp_init(BSP_INIT_LEDS, NULL);
+     /* Initialize LEDs and buttons - use BSP to control them. */
+    error_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, buttons_handler);
     APP_ERROR_CHECK(error_code);
 
     bsp_board_leds_off();
