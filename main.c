@@ -58,6 +58,7 @@
 #include "nrf_log_default_backends.h"
 
 #include "zb_multi_sensor.h"
+#include "nrf_802154.h"
 /* I2c library */
 #include "I2C.h"
 #include "BME280.h"
@@ -66,11 +67,12 @@
 #define IEEE_CHANNEL_MASK                  ZB_TRANSCEIVER_ALL_CHANNELS_MASK     /**< Scan all channel to find the coordinator. */
 #define ERASE_PERSISTENT_CONFIG            ZB_FALSE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
-#define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
-#define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                  /**< Button ID used to join to network and leave from network*/
+#define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_1                      /**< LED indicating that light switch successfully joind ZigBee network. */
+#define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                   /**< Button ID used to join to network and leave from network*/
 #define LEAVE_JOIN_BUTTON_THRESHOLD        ZB_TIME_ONE_SECOND*4                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
 #define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
 #define LEAVE_JOIN_BUTTON_LONG_POLL_TMO    ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
+#define LED_BLINK                          ZB_MILLISECONDS_TO_BEACON_INTERVAL(150) /**< Led on-off timeout. */
 
 static zb_bool_t in_progress;
 static zb_bool_t joined;
@@ -227,6 +229,26 @@ static void multi_sensor_clusters_attr_init(void)
     m_dev_ctx.power_attr.alarm_state              = ZB_ZCL_POWER_CONFIG_BATTERY_ALARM_STATE_DEFAULT_VALUE;
 }
 
+
+/**@brief Led blink function
+ *
+ * @param[in]   count of blink
+ */
+static zb_void_t led_blink(zb_uint8_t count) 
+{
+    zb_ret_t zb_err_code;
+
+    count--;
+
+    if (count !=0)
+    {
+      bsp_board_led_invert(ZIGBEE_NETWORK_STATE_LED);
+      zb_err_code = ZB_SCHEDULE_ALARM(led_blink, count, LED_BLINK);
+      ZB_ERROR_CHECK(zb_err_code);
+    }
+}
+ 
+
 /**@brief Callback for detecting button press duration.
  *
  * @param[in]   button   BSP Button that was pressed.
@@ -259,6 +281,7 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
             {
               NRF_LOG_INFO("Short press. Joined, asking from network for new data");
               zb_zdo_pim_start_turbo_poll_packets(10);
+              led_blink(3);
             }
             else
             {
@@ -338,7 +361,7 @@ static zb_void_t leds_init(void)
     error_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, buttons_handler);
     APP_ERROR_CHECK(error_code);
 
-    bsp_board_leds_off();
+    bsp_board_led_on(ZIGBEE_NETWORK_STATE_LED);
 }
 
 
@@ -434,8 +457,8 @@ void zboss_signal_handler(zb_uint8_t param)
             if (status == RET_OK)
             {
                 NRF_LOG_INFO("Joined network successfully");
-                bsp_board_led_on(ZIGBEE_NETWORK_STATE_LED);
                 joined = ZB_TRUE;
+                led_blink(5);
                 /* timeout for receiving data from sensor and voltage from battery */
                 ret_code_t err_code = app_timer_start(zb_app_timer, APP_TIMER_TICKS(30000), NULL);
                 APP_ERROR_CHECK(err_code);
@@ -444,17 +467,17 @@ void zboss_signal_handler(zb_uint8_t param)
             }
             else
             {
-                    NRF_LOG_ERROR("Failed to join network. Status: %d", status);
-                    joined = ZB_FALSE;
-                    bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
+                led_blink(7);
+                NRF_LOG_ERROR("Failed to join network. Status: %d", status);
+                joined = ZB_FALSE;
             }
             break;
 
         case ZB_ZDO_SIGNAL_LEAVE:
             if (status == RET_OK)
             {
-                bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
                 joined = ZB_FALSE;
+                led_blink(9);
                 ret_code_t err_code = app_timer_stop(zb_app_timer);
                 APP_ERROR_CHECK(err_code);
                 zb_zdo_signal_leave_params_t *p_leave_params = ZB_ZDO_SIGNAL_GET_PARAMS(p_sg_p, zb_zdo_signal_leave_params_t);
@@ -539,7 +562,8 @@ int main(void)
 
     /* Initialize sensor device attibutes */
     multi_sensor_clusters_attr_init();
-
+    /*set tx power +8dbM */
+    nrf_802154_tx_power_set(8);
     /** Start Zigbee Stack. */
     zb_err_code = zboss_start();
     ZB_ERROR_CHECK(zb_err_code);
