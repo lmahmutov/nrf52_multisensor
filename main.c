@@ -68,14 +68,13 @@
 
 #define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
 #define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                  /**< Button ID used to join to network and leave from network*/
-#define LEAVE_JOIN_BUTTON_THRESHOLD       ZB_TIME_ONE_SECOND                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
-#define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO  ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
-#define LEAVE_JOIN_BUTTON_LONG_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
+#define LEAVE_JOIN_BUTTON_THRESHOLD        ZB_TIME_ONE_SECOND*4                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
+#define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
+#define LEAVE_JOIN_BUTTON_LONG_POLL_TMO    ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
 
 static zb_bool_t in_progress;
 static zb_bool_t joined;
 static zb_time_t timestamp;
-static int try_to_connect = 5;
 
 /* --------- BME280--------*/
 static int32_t  resultPTH[3];
@@ -228,35 +227,6 @@ static void multi_sensor_clusters_attr_init(void)
     m_dev_ctx.power_attr.alarm_state              = ZB_ZCL_POWER_CONFIG_BATTERY_ALARM_STATE_DEFAULT_VALUE;
 }
 
-/**@brief Perform local operation - leave network.
- *
- * @param[in]   param   Reference to ZigBee stack buffer that will be used to construct leave request.
- */
-static void leave_nwk(zb_uint8_t param)
-{
-    zb_ret_t zb_err_code;
-
-    /* We are going to leave */
-    if (param)
-    {
-        zb_buf_t                  * p_buf = ZB_BUF_FROM_REF(param);
-        zb_zdo_mgmt_leave_param_t * p_req_param;
-
-        p_req_param = ZB_GET_BUF_PARAM(p_buf, zb_zdo_mgmt_leave_param_t);
-        UNUSED_RETURN_VALUE(ZB_BZERO(p_req_param, sizeof(zb_zdo_mgmt_leave_param_t)));
-
-        /* Set dst_addr == local address for local leave */
-        p_req_param->dst_addr = ZB_PIBCACHE_NETWORK_ADDRESS();
-        p_req_param->rejoin   = ZB_FALSE;
-        UNUSED_RETURN_VALUE(zdo_mgmt_leave_req(param, NULL));
-    }
-    else
-    {
-        zb_err_code = ZB_GET_OUT_BUF_DELAYED(leave_nwk);
-        ZB_ERROR_CHECK(zb_err_code);
-    }
-}
-
 /**@brief Callback for detecting button press duration.
  *
  * @param[in]   button   BSP Button that was pressed.
@@ -293,7 +263,6 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
             else
             {
               NRF_LOG_INFO("Short press. Not joined, starting join attempt");
-              try_to_connect = 5;
               ret = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
               ZB_COMM_STATUS_CHECK(ret);
             }            
@@ -308,10 +277,9 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
         {
            if (joined)
             {
-              /* TODO! Check this mechanics!!! */
               NRF_LOG_INFO("Long press. Leaving from network - and soft reset");
-                leave_nwk(0);
-                zb_bdb_reset_via_local_action(0);
+              zb_bdb_reset_via_local_action(0);
+              NVIC_SystemReset();
             }
             else
             {
@@ -473,18 +441,12 @@ void zboss_signal_handler(zb_uint8_t param)
                 APP_ERROR_CHECK(err_code);
                 /* change data request timeout */
                 zb_zdo_pim_set_long_poll_interval(60000);
-                try_to_connect = 5;
             }
             else
             {
-                if (try_to_connect!=0) {
                     NRF_LOG_ERROR("Failed to join network. Status: %d", status);
                     joined = ZB_FALSE;
                     bsp_board_led_off(ZIGBEE_NETWORK_STATE_LED);
-                    comm_status = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
-                    ZB_COMM_STATUS_CHECK(comm_status);
-                    try_to_connect --;
-                }
             }
             break;
 
@@ -539,7 +501,7 @@ int main(void)
     /* Initialize loging system and GPIOs. */
     timers_init();
     log_init();
-    leds_init();
+    
     /* I2C Init */
     I2C_init();
     BME280_Turn_On();
@@ -562,6 +524,8 @@ int main(void)
     /* Set static long IEEE address. */
     zb_set_network_ed_role(IEEE_CHANNEL_MASK);
     zigbee_erase_persistent_storage(ERASE_PERSISTENT_CONFIG);
+
+    leds_init();
 
     zb_set_ed_timeout(ED_AGING_TIMEOUT_64MIN);
     zb_set_keepalive_timeout(ZB_MILLISECONDS_TO_BEACON_INTERVAL(60000));
