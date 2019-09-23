@@ -63,7 +63,7 @@
 #include "BME280.h"
 #include "ADC.h"
 
-#define IEEE_CHANNEL_MASK                  (1l << ZIGBEE_CHANNEL)               /**< Scan only one, predefined channel to find the coordinator. */
+#define IEEE_CHANNEL_MASK                  ZB_TRANSCEIVER_ALL_CHANNELS_MASK     /**< Scan all channel to find the coordinator. */
 #define ERASE_PERSISTENT_CONFIG            ZB_FALSE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
 #define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_2                      /**< LED indicating that light switch successfully joind ZigBee network. */
@@ -228,6 +228,34 @@ static void multi_sensor_clusters_attr_init(void)
     m_dev_ctx.power_attr.alarm_state              = ZB_ZCL_POWER_CONFIG_BATTERY_ALARM_STATE_DEFAULT_VALUE;
 }
 
+/**@brief Perform local operation - leave network.
+ *
+ * @param[in]   param   Reference to ZigBee stack buffer that will be used to construct leave request.
+ */
+static void leave_nwk(zb_uint8_t param)
+{
+    zb_ret_t zb_err_code;
+
+    /* We are going to leave */
+    if (param)
+    {
+        zb_buf_t                  * p_buf = ZB_BUF_FROM_REF(param);
+        zb_zdo_mgmt_leave_param_t * p_req_param;
+
+        p_req_param = ZB_GET_BUF_PARAM(p_buf, zb_zdo_mgmt_leave_param_t);
+        UNUSED_RETURN_VALUE(ZB_BZERO(p_req_param, sizeof(zb_zdo_mgmt_leave_param_t)));
+
+        /* Set dst_addr == local address for local leave */
+        p_req_param->dst_addr = ZB_PIBCACHE_NETWORK_ADDRESS();
+        p_req_param->rejoin   = ZB_FALSE;
+        UNUSED_RETURN_VALUE(zdo_mgmt_leave_req(param, NULL));
+    }
+    else
+    {
+        zb_err_code = ZB_GET_OUT_BUF_DELAYED(leave_nwk);
+        ZB_ERROR_CHECK(zb_err_code);
+    }
+}
 
 /**@brief Callback for detecting button press duration.
  *
@@ -259,7 +287,8 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
             /* Check joined or not!!!. */
             if (joined)
             {
-              NRF_LOG_INFO("Short press. Joined");
+              NRF_LOG_INFO("Short press. Joined, asking from network for new data");
+              zb_zdo_pim_start_turbo_poll_packets(10);
             }
             else
             {
@@ -279,8 +308,10 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
         {
            if (joined)
             {
+              /* TODO! Check this mechanics!!! */
               NRF_LOG_INFO("Long press. Leaving from network - and soft reset");
-              zb_bdb_reset_via_local_action(0);
+                leave_nwk(0);
+                zb_bdb_reset_via_local_action(0);
             }
             else
             {
@@ -342,6 +373,8 @@ static zb_void_t leds_init(void)
     bsp_board_leds_off();
 }
 
+
+
 /**@brief Function for handling nrf app timer.
  * 
  * @param[IN]   context   Void pointer to context function is called with.
@@ -350,7 +383,7 @@ static zb_void_t leds_init(void)
  */
 static void zb_app_timer_handler(void * context)
 {
-    zb_zcl_status_t zcl_status;
+   zb_zcl_status_t zcl_status;
     static zb_int16_t new_temp_value, new_humm_value, new_pres_value;
     static zb_int8_t new_voltage_value;
     
@@ -411,7 +444,6 @@ static void zb_app_timer_handler(void * context)
     {
         NRF_LOG_INFO("Set voltage value fail. zcl_status: %d", zcl_status);
     }
-
 }
 
 
@@ -436,8 +468,11 @@ void zboss_signal_handler(zb_uint8_t param)
                 NRF_LOG_INFO("Joined network successfully");
                 bsp_board_led_on(ZIGBEE_NETWORK_STATE_LED);
                 joined = ZB_TRUE;
-                ret_code_t err_code = app_timer_start(zb_app_timer, APP_TIMER_TICKS(1000), NULL);
+                /* timeout for receiving data from sensor and voltage from battery */
+                ret_code_t err_code = app_timer_start(zb_app_timer, APP_TIMER_TICKS(30000), NULL);
                 APP_ERROR_CHECK(err_code);
+                /* change data request timeout */
+                zb_zdo_pim_set_long_poll_interval(60000);
                 try_to_connect = 5;
             }
             else
@@ -529,7 +564,7 @@ int main(void)
     zigbee_erase_persistent_storage(ERASE_PERSISTENT_CONFIG);
 
     zb_set_ed_timeout(ED_AGING_TIMEOUT_64MIN);
-    zb_set_keepalive_timeout(ZB_MILLISECONDS_TO_BEACON_INTERVAL(3000));
+    zb_set_keepalive_timeout(ZB_MILLISECONDS_TO_BEACON_INTERVAL(60000));
     zb_set_rx_on_when_idle(ZB_FALSE);
 
     /* Initialize application context structure. */
