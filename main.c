@@ -72,7 +72,7 @@
 #define LEAVE_JOIN_BUTTON_THRESHOLD        ZB_TIME_ONE_SECOND*4                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
 #define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
 #define LEAVE_JOIN_BUTTON_LONG_POLL_TMO    ZB_MILLISECONDS_TO_BEACON_INTERVAL(300) /**< Time after which the button state is checked again to detect button hold - the dimm command is sent again. */
-#define LED_BLINK                          ZB_MILLISECONDS_TO_BEACON_INTERVAL(150) /**< Led on-off timeout. */
+#define LED_BLINK                          ZB_MILLISECONDS_TO_BEACON_INTERVAL(100) /**< Led on-off timeout. */
 
 static zb_bool_t in_progress;
 static zb_bool_t joined;
@@ -280,14 +280,13 @@ static zb_void_t leave_join_button_handler(zb_uint8_t button)
             if (joined)
             {
               NRF_LOG_INFO("Short press. Joined, asking from network for new data");
-              zb_zdo_pim_start_turbo_poll_packets(10);
-              led_blink(3);
+              zb_zdo_pim_start_turbo_poll_packets(2);
+              led_blink(2);
             }
             else
             {
               NRF_LOG_INFO("Short press. Not joined, starting join attempt");
               ret = bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
-              ZB_COMM_STATUS_CHECK(ret);
             }            
         }
 
@@ -359,9 +358,10 @@ static zb_void_t leds_init(void)
 
      /* Initialize LEDs and buttons - use BSP to control them. */
     error_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, buttons_handler);
+//    error_code = bsp_init(BSP_INIT_LEDS,NULL);
     APP_ERROR_CHECK(error_code);
 
-    bsp_board_led_on(ZIGBEE_NETWORK_STATE_LED);
+    bsp_board_leds_off();
 }
 
 
@@ -458,7 +458,7 @@ void zboss_signal_handler(zb_uint8_t param)
             {
                 NRF_LOG_INFO("Joined network successfully");
                 joined = ZB_TRUE;
-                led_blink(5);
+                led_blink(4);
                 /* timeout for receiving data from sensor and voltage from battery */
                 ret_code_t err_code = app_timer_start(zb_app_timer, APP_TIMER_TICKS(30000), NULL);
                 APP_ERROR_CHECK(err_code);
@@ -467,7 +467,7 @@ void zboss_signal_handler(zb_uint8_t param)
             }
             else
             {
-                led_blink(7);
+                led_blink(6);
                 NRF_LOG_ERROR("Failed to join network. Status: %d", status);
                 joined = ZB_FALSE;
             }
@@ -477,7 +477,7 @@ void zboss_signal_handler(zb_uint8_t param)
             if (status == RET_OK)
             {
                 joined = ZB_FALSE;
-                led_blink(9);
+                led_blink(8);
                 ret_code_t err_code = app_timer_stop(zb_app_timer);
                 APP_ERROR_CHECK(err_code);
                 zb_zdo_signal_leave_params_t *p_leave_params = ZB_ZDO_SIGNAL_GET_PARAMS(p_sg_p, zb_zdo_signal_leave_params_t);
@@ -520,7 +520,7 @@ int main(void)
     zb_ret_t       zb_err_code;
     ret_code_t     err_code;
     zb_ieee_addr_t ieee_addr;
-
+    NRF_POWER->DCDCEN = 1;
     /* Initialize loging system and GPIOs. */
     timers_init();
     log_init();

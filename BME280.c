@@ -88,9 +88,9 @@ int16_t  dig_T2, dig_T3, dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8,
 
 // Specify BME280 configuration
 // set pressure and temperature output data rate
-uint8_t Posr = P_OSR_16, Hosr = H_OSR_16, Tosr = T_OSR_02, Mode = normal, IIRFilter = BW0_021ODR, SBy = t_62_5ms; 
+//uint8_t Posr = P_OSR_16, Hosr = H_OSR_16, Tosr = T_OSR_02, Mode = normal, IIRFilter = BW0_021ODR, SBy = t_62_5ms; 
 /* @EfektaSB */
-//uint8_t Posr = P_OSR_01, Hosr = H_OSR_01, Tosr = T_OSR_01, Mode = forced, IIRFilter = full, SBy = t_00_5ms;
+uint8_t Posr = P_OSR_01, Hosr = H_OSR_01, Tosr = T_OSR_01, Mode = forced, IIRFilter = full, SBy = t_00_5ms;
 
 // * @brief Function for setting active
 void BME280_Turn_On(void)
@@ -155,6 +155,7 @@ void BME280_Configure( uint8_t address )
 
 void BME280_Get_Data(int32_t * resultPTH)
 {
+  writeByte(BME280_ADDRESS_1, BME280_CTRL_MEAS, Tosr << 5 | Posr << 2 | Mode);
   readBytes(BME280_ADDRESS_1, BME280_PRESS_MSB, rawData, 8);  
   
   //Pressure
@@ -179,7 +180,7 @@ void BME280_Get_Data(int32_t * resultPTH)
 }  
 
 // Returns humidity in %RH as unsigned 32 bit integer in Q22.10 format (22integer and 10fractional bits).
-// Output value of â€œ47445â€represents 47445/1024= 46.333%RH
+// Output value of “47445”represents 47445/1024= 46.333%RH
 uint32_t BME280_Compensate_H(int32_t adc_H, int32_t t_fine)
 {
   int32_t varH;
@@ -194,7 +195,7 @@ uint32_t BME280_Compensate_H(int32_t adc_H, int32_t t_fine)
 }
 
 // Returns temperature in DegC, resolution is 0.01 DegC. Output value of
-// â€œ5123â€ equals 51.23 DegC.
+// “5123” equals 51.23 DegC.
 int32_t BME280_Compensate_T(int32_t t_fine)
 {
   int32_t T;
@@ -205,7 +206,7 @@ int32_t BME280_Compensate_T(int32_t t_fine)
   return T;
 }
 
-// Returns pressure in Pa as unsigned 32 bit integer. Output value of â€œ96386â€ equals 96386 Pa = 963.86 hPa
+// Returns pressure in Pa as unsigned 32 bit integer. Output value of “96386” equals 96386 Pa = 963.86 hPa
 uint32_t BME280_Compensate_P(int32_t adc_P, int32_t t_fine) 
 {
     varP1 = (t_fine>>1) - (int32_t)64000;
@@ -232,6 +233,5 @@ uint32_t BME280_Compensate_P(int32_t adc_P, int32_t t_fine)
     P = (uint32_t)((int32_t)P + ((varP1 + varP2 + dig_P7) >> 4));
     return P;
 }
-
 
 

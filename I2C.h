@@ -8,16 +8,10 @@ extern "C" {
 
     #include "nrf_drv_twi.h"
     #include "app_error.h" //for APP_ERROR_CHECK(err_code);
-		#include "nrf_delay.h"
-    #ifdef DEBUG_MODE
-		#include "SEGGER_RTT.h"
-		#endif
 
     void I2C_init( void );
     
     void writeByte( uint8_t address, uint8_t subAddress, uint8_t data);
-    
-    void writeBytes(uint8_t address, uint8_t * data, uint8_t n_bytes);
     
     void readBytes( uint8_t address, uint8_t subAddress, uint8_t * dest, uint8_t n_bytes);
     
@@ -25,9 +19,6 @@ extern "C" {
     
     void I2C_handler(nrf_drv_twi_evt_t const * p_event, void * p_context);
 
-    void hdc1080_init(void);
-
-    void hdc1080_get(void);
 
 #ifdef __cplusplus
 }
