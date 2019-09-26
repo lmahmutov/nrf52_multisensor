@@ -67,7 +67,7 @@
 #define IEEE_CHANNEL_MASK                  ZB_TRANSCEIVER_ALL_CHANNELS_MASK     /**< Scan all channel to find the coordinator. */
 #define ERASE_PERSISTENT_CONFIG            ZB_FALSE                             /**< Do not erase NVRAM to save the network parameters after device reboot or power-off. */
 
-#define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_1                      /**< LED indicating that light switch successfully joind ZigBee network. */
+#define ZIGBEE_NETWORK_STATE_LED           BSP_BOARD_LED_0                      /**< LED indicating that light switch successfully joind ZigBee network. */
 #define LEAVE_JOIN_BUTTON                  BSP_BOARD_BUTTON_0                   /**< Button ID used to join to network and leave from network*/
 #define LEAVE_JOIN_BUTTON_THRESHOLD        ZB_TIME_ONE_SECOND*4                      /**< Number of beacon intervals the button should be pressed to dimm the light bulb. */
 #define LEAVE_JOIN_BUTTON_SHORT_POLL_TMO   ZB_MILLISECONDS_TO_BEACON_INTERVAL(50)  /**< Delay between button state checks used in order to detect button long press. */
