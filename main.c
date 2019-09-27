@@ -376,14 +376,15 @@ static void zb_app_timer_handler(void * context)
 {
    zb_zcl_status_t zcl_status;
     static zb_int16_t new_temp_value, new_humm_value, new_pres_value;
-    static zb_int8_t new_voltage_value;
+    static zb_int8_t new_voltage_value, new_percent_value;
     
     /* Get data from bme280 */
     BME280_Get_Data( resultPTH );
     /* Get battery voltage                     */
-    int16_t VBAT = GetBatteryVoltage1();
+    uint16_t VBAT = GetBatteryVoltage1();
+    uint8_t batteryPercentageRemaining = battery_level_in_percent(VBAT);
     NRF_LOG_INFO("Battery voltage %d.", VBAT);
-
+    NRF_LOG_INFO("Battery percent %d.", batteryPercentageRemaining);
     /* Get new temperature measured value */
      new_temp_value = (zb_int16_t)resultPTH[1];
     zcl_status = zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT, 
@@ -434,6 +435,19 @@ static void zb_app_timer_handler(void * context)
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         NRF_LOG_INFO("Set voltage value fail. zcl_status: %d", zcl_status);
+    }
+
+    /* Get new batteryPercentageRemaining value */
+    new_percent_value =   (zb_int8_t)(batteryPercentageRemaining);
+    zb_zcl_set_attr_val(MULTI_SENSOR_ENDPOINT,
+                                     ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
+                                     ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_REMAINING_ID, 
+                                     (zb_uint8_t *)&new_percent_value, 
+                                     ZB_FALSE);
+    if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
+    {
+        NRF_LOG_INFO("Set batteryPercentageRemaining value fail. zcl_status: %d", zcl_status);
     }
 }
 
